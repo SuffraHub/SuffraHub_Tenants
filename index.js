@@ -8,7 +8,10 @@ const cors = require('cors');
 require('dotenv').config();
 const mysql = require('mysql');
 
-app.use(cors());
+app.use(cors({
+  origin: 'http://localhost:5173', // lub inny frontend origin
+  credentials: true,
+}));
 app.use(express.json());
 
 const connection = mysql.createConnection({
