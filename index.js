@@ -210,6 +210,45 @@ app.post('/log', (req, res) => {
   );
 });
 
+function formatDate(timestamp) {
+  const date = new Date(timestamp);
+
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  const dd = String(date.getDate()).padStart(2, '0');
+
+  const hh = String(date.getHours()).padStart(2, '0');
+  const mi = String(date.getMinutes()).padStart(2, '0');
+  const ss = String(date.getSeconds()).padStart(2, '0');
+
+  return `${yyyy}-${mm}-${dd} ${hh}:${mi}:${ss}`;
+}
+
+app.post('/api/logs/recent', (req, res) => {
+  const query = `SELECT id, timestamp, url, type, method FROM logs ORDER BY id DESC LIMIT 5`;
+
+  connection.query(query, (err, results) => {
+    if (err) {
+      console.error('Error fetching logs:', err);
+      return res.status(500).json({ error: 'Database error' });
+    }
+
+    const formatted = results.map(log => {
+      const urlObj = new URL(log.url, 'http://localhost');
+      const path = urlObj.pathname.replace(/^\/+|\/+$/g, '');
+      const lastSegment = path.split('/')[0];
+
+      return {
+        date: formatDate(log.timestamp),
+        change: `${log.type} ${log.method} ${lastSegment}`
+      };
+    });
+
+    res.json(formatted);
+  });
+});
+
+
 
 app.listen(port, () => {
   console.log(`Tenant API listening on port ${port}`);
