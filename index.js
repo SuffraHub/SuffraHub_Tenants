@@ -8,7 +8,10 @@ const cors = require('cors');
 require('dotenv').config();
 const mysql = require('mysql');
 
-app.use(cors());
+app.use(cors({
+  origin: 'http://localhost:5173', // lub inny frontend origin
+  credentials: true,
+}));
 app.use(express.json());
 
 const connection = mysql.createConnection({
@@ -25,6 +28,60 @@ connection.connect(err => {
   }
   console.log('Connected to MySQL');
 });
+
+
+// === 4. Utwórz nową dzierżawę ===
+app.post('/create-tenant', (req, res) => {
+  const { name, description, user_id } = req.body;
+
+  if (!name || !description || !user_id) {
+    return res.status(400).json({ error: 'Missing required fields' });
+  }
+
+  connection.beginTransaction(err => {
+    if (err) {
+      return res.status(500).json({ error: 'Transaction error' });
+    }
+
+    connection.query(
+      'INSERT INTO tenants (name, description) VALUES (?, ?)',
+      [name, description],
+      (err, result) => {
+        if (err) {
+          return connection.rollback(() => {
+            res.status(500).json({ error: 'Failed to create tenant' });
+          });
+        }
+
+        const newCompanyId = result.insertId;
+
+        // zaktualizuj użytkownika
+        connection.query(
+          'UPDATE users SET company_id = ? WHERE id = ?',
+          [newCompanyId, user_id],
+          (err) => {
+            if (err) {
+              return connection.rollback(() => {
+                res.status(500).json({ error: 'Failed to update user' });
+              });
+            }
+
+            connection.commit(err => {
+              if (err) {
+                return connection.rollback(() => {
+                  res.status(500).json({ error: 'Commit failed' });
+                });
+              }
+
+              res.json({ message: 'Tenant created', company_id: newCompanyId });
+            });
+          }
+        );
+      }
+    );
+  });
+});
+
 
 // === 1. Pobierz dane firmy (dzierżawy) ===
 app.get('/tenant-info/:company_id', (req, res) => {
