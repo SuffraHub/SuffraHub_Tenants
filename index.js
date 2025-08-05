@@ -2,7 +2,7 @@
 
 const express = require('express');
 const app = express();
-const port = 8001;
+const port = 8006;
 
 const cors = require('cors');
 require('dotenv').config();
@@ -179,6 +179,37 @@ app.get('/options-by-tenant/:tenant_id', (req, res) => {
     res.json({ options: results });
   });
 });
+
+app.post('/log', (req, res) => {
+  const { type, method, url, timestamp, status, data, error } = req.body;
+
+  const query = `
+    INSERT INTO logs (type, method, url, timestamp, status, data, error)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `;
+
+  connection.query(
+    query,
+    [
+      type,
+      method,
+      url,
+      timestamp,
+      status || null,
+      JSON.stringify(data || null),
+      error || null,
+    ],
+    (err, result) => {
+      if (err) {
+        console.error('Failed to save log:', err);
+        return res.status(500).json({ error: 'Database error' });
+      }
+
+      res.status(201).json({ message: 'Log saved' });
+    }
+  );
+});
+
 
 app.listen(port, () => {
   console.log(`Tenant API listening on port ${port}`);
